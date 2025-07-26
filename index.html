@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cotigo</title>
+    <meta name="description" content="基于 Emotiv 脑机接口的正念训练游戏">
+    <meta name="keywords" content="正念冥想,脑机接口,放松,冥想,Emotiv,脑电图,可视化">
+    <meta name="author" content="XiaU">
+    <meta name="theme-color" content="#121212">
+    <!-- 预加载关键资源 -->
+    <link rel="preload" href="js/visual-engine.js" as="script">
+    <link rel="preload" href="js/mindfulness-game.js" as="script">
+    <link rel="preload" href="js/main.js" as="script">
+    
+    <style>
+        :root {
+            --color-background: #121212;
+            --color-background-lighter: #1e1e1e;
+            --color-primary: #8b5cf6;
+            --color-primary-light: #a78bfa;
+            --color-primary-dark: #7c3aed;
+            --color-accent: #10b981;
+            --color-error: #ef4444;
+            --color-warning: #f59e0b;
+            --color-text: #ffffff;
+            --color-text-secondary: rgba(255, 255, 255, 0.7);
+            --color-border: rgba(255, 255, 255, 0.1);
+            
+            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+            --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
+            --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
+            
+            --transition-fast: 0.2s ease;
+            --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-slow: 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            
+            --border-radius-sm: 8px;
+            --border-radius-md: 12px;
+            --border-radius-lg: 20px;
+            --border-radius-full: 9999px;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--color-background);
+            height: 100vh;
+            overflow: hidden;
+            color: var(--color-text);
+            line-height: 1.5;
+        }
+        
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        #visualCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, #131313 0%, var(--color-background) 100%);
+            z-index: 1;
+        }
+        
+        #fluidCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+            mix-blend-mode: screen;
+        }
+        
+        /* 全屏沉浸式UI容器 */
+        #uiContainer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+            opacity: 0;
+            transition: opacity var(--transition-normal);
+        }
+        
+        /* 显示UI控件 */
+        #gameContainer:hover #uiContainer,
+        #uiContainer:hover,
+        #uiContainer.active {
+            opacity: 1;
+        }
+        
+        /* 控制按钮悬浮栏 */
+        .control-bar {
+            position: absolute;
+            left: 50%;
+            bottom: 30px;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 12px;
+            pointer-events: auto;
+            transition: all var(--transition-normal);
+            padding: 12px 16px;
+            background: rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(12px);
+            border-radius: var(--border-radius-lg);
+            border: 1px solid var(--color-border);
+            box-shadow: var(--shadow-lg);
+        }
+        
+        /* 极简UI面板 */
+        .ui-panel {
+            position: absolute;
+            background: rgba(30, 30, 30, 0.6);
+            backdrop-filter: blur(16px) saturate(180%);
+            border-radius: var(--border-radius-lg);
+            padding: 18px;
+            color: var(--color-text);
+            pointer-events: auto;
+            border: 1px solid var(--color-border);
+            transition: all var(--transition-normal);
+            font-weight: 300;
+            box-shadow: var(--shadow-lg);
+            max-width: 220px;
+            overflow: hidden;
+        }
+        
+        .ui-panel:hover {
+            background: rgba(35, 35, 35, 0.75);
+            border-color: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.4);
+        }
+        
+        /* 极简控制面板 */
+        #controlPanel {
+            top: 24px;
+            left: 24px;
+            width: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            transform: translateX(-110%);
+            opacity: 0;
+        }
+        
+        #controlPanel:hover,
+        #controlPanel.active {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        
+        /* 状态面板 */
+        #statusPanel {
+            top: 24px;
+            right: 24px;
+            transform: translateX(110%);
+            opacity: 0;
+        }
+        
+        #statusPanel:hover,
+        #statusPanel.active {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        
+        /* 隐藏指标面板，由视觉效果直接表达 */
+        #metricsPanel {
+            display: none;
+        }
+        
+        /* 控制按钮 */
+        .btn {
+            background: rgba(35, 35, 35, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--color-border);
+            color: var(--color-text);
+            padding: 0;
+            border-radius: var(--border-radius-full);
+            width: 52px;
+            height: 52px;
+            cursor: pointer;
+            transition: all var(--transition-normal);
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            box-shadow: var(--shadow-md);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at center, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 70%);
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+        
+        .btn:hover:not(:disabled)::after {
+            opacity: 1;
+        }
+        
+        .btn:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: var(--shadow-lg);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+        
+        .btn:active:not(:disabled) {
+            transform: translateY(0);
+            box-shadow: var(--shadow-sm);
+        }
+        
+        .btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none;
+            filter: grayscale(0.5);
+        }
+        
+        .btn-primary {
+            background: rgba(139, 92, 246, 0.4);
+            border-color: rgba(139, 92, 246, 0.4);
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            background: rgba(139, 92, 246, 0.5);
+            border-color: rgba(139, 92, 246, 0.5);
+            box-shadow: 0 8px 32px rgba(139, 92, 246, 0.35);
+        }
+        
+        .btn.active {
+            background: rgba(139, 92, 246, 0.4);
+            border-color: rgba(139, 92, 246, 0.4);
+            box-shadow: 0 0 15px rgba(139, 92, 246, 0.5);
+        }
+        
+        /* 状态指示器 */
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 12px;
+            position: relative;
+        }
+        
+        .status-indicator::after {
+            content: '';
+            position: absolute;
+            top: -4px;
+            left: -4px;
+            right: -4px;
+            bottom: -4px;
+            border-radius: 50%;
+            opacity: 0.3;
+            z-index: -1;
+        }
+        
+        .status-connected { 
+            background: var(--color-accent);
+            box-shadow: 0 0 12px rgba(16, 185, 129, 0.6);
+        }
+        
+        .status-connected::after {
+            background: var(--color-accent);
+            box-shadow: 0 0 12px rgba(16, 185, 129, 0.3);
+            animation: pulse-success 2s infinite;
+        }
+        
+        .status-disconnected { 
+            background: var(--color-error);
+            box-shadow: 0 0 12px rgba(239, 68, 68, 0.6);
+        }
+        
+        .status-disconnected::after {
+            background: var(--color-error);
+            box-shadow: 0 0 12px rgba(239, 68, 68, 0.3);
+        }
+        
+        .status-connecting { 
+            background: var(--color-warning);
+            box-shadow: 0 0 12px rgba(245, 158, 11, 0.6);
+        }
+        
+        .status-connecting::after {
+            background: var(--color-warning);
+            box-shadow: 0 0 12px rgba(245, 158, 11, 0.3);
+            animation: pulse-connecting 1.5s infinite;
+        }
+        
+        @keyframes pulse-connecting {
+            0%, 100% { opacity: 0.3; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(1.5); }
+        }
+        
+        @keyframes pulse-success {
+            0%, 100% { opacity: 0.2; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(1.3); }
+        }
+        
+        .status-item {
+            display: flex;
+            align-items: center;
+            margin: 12px 0;
+            font-size: 13px;
+            color: var(--color-text-secondary);
+            white-space: nowrap;
+            position: relative;
+            padding-left: 5px;
+        }
+        
+        
+        /* 悬浮指标显示 */
+        .floating-metrics {
+            position: absolute;
+            top: 50%;
+            right: 40px;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+            pointer-events: none;
+            opacity: 0.85;
+            transition: opacity var(--transition-normal);
+        }
+        
+        .floating-metrics:hover {
+            opacity: 1;
+        }
+        
+        .metric-circle {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            position: relative;
+            box-shadow: var(--shadow-md);
+            transition: transform 0.3s ease, opacity 0.3s ease;
+        }
+        
+        .metric-circle::after {
+            content: "";
+            position: absolute;
+            top: -5px;
+            left: -5px;
+            right: -5px;
+            bottom: -5px;
+            border-radius: 50%;
+            opacity: 0.5;
+            z-index: -1;
+        }
+        
+        .metric-label {
+            position: absolute;
+            left: -80px;
+            white-space: nowrap;
+            font-size: 13px;
+            background: rgba(20, 20, 20, 0.6);
+            padding: 3px 8px;
+            border-radius: var(--border-radius-sm);
+            opacity: 0;
+            transform: translateX(-10px);
+            transition: all var(--transition-fast);
+        }
+        
+        .metric-circle:hover {
+            transform: scale(1.1);
+        }
+        
+        .metric-circle:hover .metric-label {
+            opacity: 1;
+            transform: translateX(0);
+        }
+        
+        .stress-circle {
+            background: var(--color-error);
+        }
+        
+        .stress-circle::after {
+            background: radial-gradient(circle, rgba(239, 68, 68, 0.6) 0%, rgba(239, 68, 68, 0) 70%);
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.8);
+        }
+        
+        .attention-circle {
+            background: #3b82f6;
+        }
+        
+        .attention-circle::after {
+            background: radial-gradient(circle, rgba(59, 130, 246, 0.6) 0%, rgba(59, 130, 246, 0) 70%);
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.8);
+        }
+        
+        .relaxation-circle {
+            background: var(--color-primary);
+        }
+        
+        .relaxation-circle::after {
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.6) 0%, rgba(139, 92, 246, 0) 70%);
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.8);
+        }
+        
+        /* 加载动画 */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--color-background);
+            background: radial-gradient(circle at center, #1a1a1a 0%, var(--color-background) 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            transition: opacity 0.8s ease;
+        }
+        
+        .loading-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        .loading-spinner {
+            width: 80px;
+            height: 80px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .loading-spinner:before,
+        .loading-spinner:after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 3px solid transparent;
+            border-top-color: var(--color-primary);
+            animation: spin 1.5s cubic-bezier(0.34, 0.34, 0.64, 0.64) infinite;
+        }
+        
+        .loading-spinner:before {
+            z-index: 10;
+        }
+        
+        .loading-spinner:after {
+            border-top-color: rgba(139, 92, 246, 0.3);
+            animation-duration: 1.8s;
+            animation-delay: 0.2s;
+        }
+        
+        .loading-spinner::before {
+            animation: spin 1.5s cubic-bezier(0.34, 0.34, 0.64, 0.64) infinite;
+        }
+        
+        .loading-spinner::after {
+            width: 80%;
+            height: 80%;
+            animation: spin 2s cubic-bezier(0.34, 0.34, 0.64, 0.64) infinite reverse;
+        }
+        
+        .loading-spinner-inner {
+            width: 15px;
+            height: 15px;
+            background: var(--color-primary);
+            border-radius: 50%;
+            box-shadow: 0 0 20px var(--color-primary);
+            animation: pulseFade 2s ease infinite;
+        }
+        
+        .loading-title {
+            margin-top: 32px;
+            font-size: 26px;
+            font-weight: 200;
+            letter-spacing: 0.1em;
+            opacity: 0.9;
+            text-shadow: 0 0 20px rgba(139, 92, 246, 0.5);
+            animation: pulseFade 2.5s infinite;
+        }
+        
+        .loading-subtitle {
+            margin-top: 10px;
+            font-size: 14px;
+            font-weight: 300;
+            letter-spacing: 0.05em;
+            color: var(--color-text-secondary);
+            max-width: 280px;
+            text-align: center;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @keyframes pulseFade {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+        
+        /* 用户引导和辅助元素 */
+        .helper-text {
+            position: absolute;
+            padding: 8px 14px;
+            background: rgba(30, 30, 30, 0.6);
+            border-radius: var(--border-radius-md);
+            font-size: 14px;
+            font-weight: 300;
+            color: var(--color-text-secondary);
+            box-shadow: var(--shadow-md);
+            backdrop-filter: blur(6px);
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all var(--transition-normal);
+            pointer-events: none;
+            text-align: center;
+            border: 1px solid var(--color-border);
+            max-width: 300px;
+            line-height: 1.4;
+        }
+        
+        .helper-text.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        /* 控制提示 */
+        .controls-hint {
+            position: absolute;
+            bottom: 90px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 14px;
+            letter-spacing: 0.05em;
+            opacity: 0.7;
+            text-align: center;
+            pointer-events: none;
+            transition: opacity 1s ease;
+            padding: 8px 16px;
+            background: rgba(30, 30, 30, 0.3);
+            border-radius: var(--border-radius-md);
+            backdrop-filter: blur(4px);
+        }
+
+        /* 状态信息 */
+        .status-message {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: 150px;
+            padding: 10px 20px;
+            background: rgba(30, 30, 30, 0.5);
+            backdrop-filter: blur(8px);
+            border-radius: var(--border-radius-md);
+            font-size: 15px;
+            color: var(--color-text);
+            opacity: 0;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            z-index: 15;
+            pointer-events: none;
+            border: 1px solid var(--color-border);
+            box-shadow: var(--shadow-md);
+            text-align: center;
+        }
+        
+        .status-message.active {
+            opacity: 1;
+        }
+
+        /* 移动设备优化 */
+        @media (max-width: 768px) {
+            .control-bar {
+                bottom: 15px;
+                gap: 8px;
+                padding: 10px;
+            }
+            
+            .btn {
+                width: 45px;
+                height: 45px;
+                font-size: 18px;
+            }
+            
+            .controls-hint {
+                font-size: 12px;
+                bottom: 70px;
+                padding: 6px 12px;
+            }
+            
+            .helper-text {
+                font-size: 13px;
+                max-width: 260px;
+                padding: 6px 10px;
+            }
+            
+            .status-message {
+                bottom: 120px;
+                font-size: 14px;
+                padding: 8px 16px;
+            }
+            
+            
+            .floating-metrics {
+                right: 20px;
+            }
+        }
+
+        /* 工具提示 */
+        .tooltip {
+            position: absolute;
+            background: rgba(20, 20, 20, 0.8);
+            color: var(--color-text);
+            padding: 6px 12px;
+            border-radius: var(--border-radius-sm);
+            font-size: 12px;
+            pointer-events: none;
+            opacity: 0;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            z-index: 100;
+            top: -35px;
+            left: 50%;
+            transform: translateX(-50%) translateY(5px);
+            backdrop-filter: blur(4px);
+            border: 1px solid var(--color-border);
+            box-shadow: var(--shadow-md);
+        }
+        
+        .btn-container {
+            position: relative;
+        }
+        
+        .btn-container:hover .tooltip {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+        
+        /* 进度和计时器指示 */
+        .progress-indicator {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(30, 30, 30, 0.5);
+            backdrop-filter: blur(8px);
+            border-radius: var(--border-radius-full);
+            padding: 8px 16px;
+            color: var(--color-text);
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            opacity: 0;
+            transition: opacity var(--transition-normal);
+            z-index: 12;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--color-border);
+            pointer-events: none;
+        }
+        
+        .progress-indicator.active {
+            opacity: 1;
+        }
+        
+        .progress-timer {
+            margin-left: 8px;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 0.5px;
+        }
+        
+        /* 呼吸指令样式 */
+        #breathingInstruction {
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+            background: rgba(0, 0, 0, 0.2) !important;
+            backdrop-filter: blur(10px) !important;
+            border-radius: 15px !important;
+            padding: 15px 25px !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            letter-spacing: 2px !important;
+            margin-top: -100px !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner">
+            <div class="loading-spinner-inner"></div>
+        </div>
+        <div class="loading-title">Cotigo</div>
+        <div class="loading-subtitle">基于 Emotiv 脑机接口的正念训练游戏</div>
+    </div>
+    
+    <div id="gameContainer">
+        <canvas id="visualCanvas"></canvas>
+        <canvas id="fluidCanvas"></canvas>
+        
+        <div id="uiContainer">
+            <!-- 悬浮的极简控制面板 -->
+            <div id="controlPanel" class="ui-panel">
+                <div class="status-item">
+                    <span class="status-indicator status-disconnected"></span>
+                    <span>设备未连接</span>
+                </div>
+            </div>
+            
+            <!-- 悬浮状态指示 -->
+            <div id="statusPanel" class="ui-panel">
+                <div class="status-item" id="connectionStatus">
+                    <span class="status-indicator status-disconnected"></span>
+                    <span>未连接</span>
+                </div>
+                <div class="status-item" id="headsetStatus">
+                    <span class="status-indicator status-disconnected"></span>
+                    <span>未检测到设备</span>
+                </div>
+                <div class="status-item" id="sessionStatus">
+                    <span class="status-indicator status-disconnected"></span>
+                    <span>无会话</span>
+                </div>
+            </div>
+            
+            <!-- 底部控制栏 - 简化为只有连接和启动/停止 -->
+            <div class="control-bar">
+                <div class="btn-container">
+                    <button id="connectBtn" class="btn btn-primary">🔗</button>
+                    <div class="tooltip">连接设备</div>
+                </div>
+                <div class="btn-container">
+                    <button id="startGameBtn" class="btn" disabled>💭</button>
+                    <div class="tooltip">开始体验</div>
+                </div>
+            </div>
+            
+            <!-- 操作提示 -->
+            <div class="controls-hint">移动鼠标显示控制面板</div>
+            
+            <!-- 状态消息 -->
+            <div class="status-message" id="statusMessage"></div>
+            
+            
+        </div>
+        
+        
+        
+        <!-- 引导和帮助元素 -->
+        <div class="helper-text" id="connectHelper">
+            首次连接设备需要授权。请在 EMOTIV Launcher 应用中确认授权请求。
+        </div>
+        
+        <div class="helper-text" id="meditationHelper">
+            保持放松，跟随中央球体进行呼吸练习。深呼吸，专注当下。
+        </div>
+        
+        <!-- 应用信息和版本 -->
+        <style>
+            .app-info {
+                position: fixed;
+                bottom: 10px;
+                left: 10px;
+                font-size: 11px;
+                color: rgba(255, 255, 255, 0.4);
+                z-index: 5;
+                pointer-events: none;
+                text-align: left;
+            }
+            
+            .keyboard-shortcuts {
+                position: fixed;
+                bottom: 10px;
+                right: 10px;
+                font-size: 11px;
+                color: rgba(255, 255, 255, 0.4);
+                z-index: 5;
+                pointer-events: none;
+                text-align: right;
+            }
+        </style>
+        
+    </div>
+
+    <!-- Three.js 库文件 -->
+    <script src="js/three.min.js"></script>
+    <script src="js/OrbitControls.js"></script>
+    <script src="js/Detector.js"></script>
+    
+    <!-- 项目文件 -->
+    <script src="js/config.js"></script>
+    <script src="js/cortex-client.js"></script>
+    <script src="js/visual-engine.js"></script>
+    <script src="js/mindfulness-game.js"></script>
+    <script src="js/main.js"></script>
+    
+    <script>
+        // 页面加载完成后隐藏加载界面
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                document.getElementById('loadingOverlay').classList.add('hidden');
+            }, 1500);
+        });
+        
+        // 添加应用版本和脑电设备信息
+        document.addEventListener('DOMContentLoaded', () => {
+            const appVersion = 'v0.3.3';
+            const appInfoElement = document.createElement('div');
+            appInfoElement.className = 'app-info';
+            appInfoElement.innerHTML = `
+                <div class="app-version">Cotigo ${appVersion}</div>
+                <div class="app-device">Emotiv 脑电设备支持</div>
+            `;
+            document.body.appendChild(appInfoElement);
+        });
+
+        // 自动隐藏控制提示 - 延长时间以确保用户看到
+        setTimeout(() => {
+            document.querySelector('.controls-hint').style.opacity = '0';
+        }, 8000);
+        
+        // 鼠标移动时显示UI，并添加淡入淡出效果
+        let uiTimeout;
+        document.addEventListener('mousemove', () => {
+            const uiContainer = document.getElementById('uiContainer');
+            uiContainer.style.opacity = '1';
+            
+            clearTimeout(uiTimeout);
+            uiTimeout = setTimeout(() => {
+                if (!uiContainer.matches(':hover') && 
+                    !document.querySelector('.control-bar').matches(':hover')) {
+                    uiContainer.style.opacity = '0';
+                }
+            }, 4000); // 增加时间，让用户有更多时间操作
+        });
+        
+    </script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+{
+  "name": "mindfulness-bci-game",
+  "version": "1.0.0",
+  "description": "基于 Emotiv 脑机接口的正念游戏",
+  "main": "index.html",
+  "scripts": {
+    "start": "python -m http.server 8080",
+    "serve": "python -m http.server 8080"
+  },
+  "keywords": [
+    "emotiv",
+    "bci",
+    "mindfulness",
+    "meditation",
+    "brain-computer-interface",
+    "cortex-api"
+  ],
+  "author": "XiaU",
+  "license": "MIT",
+  "devDependencies": {},
+  "dependencies": {},
+  "engines": {
+    "node": ">=12.0.0"
+  }
+}

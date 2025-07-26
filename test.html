@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>正念游戏测试模式</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+        }
+        
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            border-left: 4px solid #4CAF50;
+        }
+        
+        .btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            margin: 5px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+        
+        .status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        
+        .status-success { background: #4CAF50; }
+        .status-error { background: #F44336; }
+        .status-warning { background: #FF9800; }
+        
+        .log {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 5px;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+        
+        .metrics-display {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+        
+        .metric-card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🧠 正念游戏测试模式</h1>
+        <p>这个测试页面用于验证各个功能模块的正常工作。</p>
+        
+        <div class="test-section">
+            <h3>1. WebSocket 连接测试</h3>
+            <p>测试与 Cortex 服务的 WebSocket 连接。</p>
+            <button id="testWebSocket" class="btn">测试 WebSocket 连接</button>
+            <button id="testRealData" class="btn">测试实际数据流</button>
+            <span id="wsStatus" class="status status-warning">未测试</span>
+            <div id="wsLog" class="log"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>2. 视觉引擎测试</h3>
+            <p>测试粒子系统和动画效果。</p>
+            <button id="testVisuals" class="btn">启动视觉测试</button>
+            <button id="stopVisuals" class="btn">停止测试</button>
+            <span id="visualStatus" class="status status-warning">未测试</span>
+            <canvas id="testCanvas" width="400" height="200" style="border: 1px solid rgba(255,255,255,0.3); margin: 10px 0;"></canvas>
+        </div>
+        
+        <div class="test-section">
+            <h3>3. 模拟数据测试</h3>
+            <p>使用模拟的脑电数据测试游戏逻辑。</p>
+            <button id="startSimulation" class="btn">开始模拟</button>
+            <button id="stopSimulation" class="btn">停止模拟</button>
+            <span id="simStatus" class="status status-warning">未启动</span>
+            
+            <div class="metrics-display">
+                <div class="metric-card">
+                    <div>压力水平</div>
+                    <div id="simStress" class="metric-value">0%</div>
+                </div>
+                <div class="metric-card">
+                    <div>注意力</div>
+                    <div id="simAttention" class="metric-value">0%</div>
+                </div>
+                <div class="metric-card">
+                    <div>放松度</div>
+                    <div id="simRelaxation" class="metric-value">0%</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h3>4. 音频系统测试</h3>
+            <p>测试音频反馈系统。</p>
+            <button id="testAudio" class="btn">测试音频</button>
+            <span id="audioStatus" class="status status-warning">未测试</span>
+        </div>
+        
+        <div class="test-section">
+            <h3>5. 系统兼容性检查</h3>
+            <p>检查浏览器兼容性和必要的 API 支持。</p>
+            <button id="checkCompatibility" class="btn">检查兼容性</button>
+            <div id="compatibilityResults"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>6. 实时数据流监控</h3>
+            <p>监控来自 Emotiv 设备的实时数据流。</p>
+            <div class="metrics-display">
+                <div class="metric-card">
+                    <div>原始压力值</div>
+                    <div id="rawStress" class="metric-value">-</div>
+                </div>
+                <div class="metric-card">
+                    <div>原始注意力值</div>
+                    <div id="rawAttention" class="metric-value">-</div>
+                </div>
+                <div class="metric-card">
+                    <div>原始放松度值</div>
+                    <div id="rawRelaxation" class="metric-value">-</div>
+                </div>
+            </div>
+            <div id="dataStreamLog" class="log" style="height: 150px;"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>📝 测试日志</h3>
+            <div id="testResults" class="log">准备开始测试...</div>
+        </div>
+        
+        <div style="text-align: center; margin-top: 30px;">
+            <a href="index.html" class="btn" style="text-decoration: none; padding: 15px 30px; font-size: 16px;">
+                🚀 启动正式游戏
+            </a>
+        </div>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/cortex-client.js"></script>
+    <script>
+        let testVisualEngine;
+        let simulationInterval;
+        let simulationRunning = false;
+        let testCortexClient = null;
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logElement = document.getElementById('testResults');
+            const colorClass = type === 'error' ? 'color: #F44336' : 
+                              type === 'success' ? 'color: #4CAF50' : 
+                              type === 'warning' ? 'color: #FF9800' : 'color: white';
+            logElement.innerHTML += `<div style="${colorClass}">[${timestamp}] ${message}</div>`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+        
+        // WebSocket 连接测试
+        document.getElementById('testWebSocket').addEventListener('click', () => {
+            const wsLog = document.getElementById('wsLog');
+            const wsStatus = document.getElementById('wsStatus');
+            
+            wsLog.innerHTML = '';
+            wsStatus.textContent = '连接中...';
+            wsStatus.className = 'status status-warning';
+            
+            try {
+                const ws = new WebSocket('wss://localhost:6868');
+                
+                ws.onopen = () => {
+                    wsLog.innerHTML += '✅ WebSocket 连接成功<br>';
+                    wsStatus.textContent = '连接成功';
+                    wsStatus.className = 'status status-success';
+                    log('WebSocket 连接测试通过', 'success');
+                    
+                    // 发送测试请求
+                    const testRequest = {
+                        jsonrpc: "2.0",
+                        method: "getCortexInfo",
+                        id: 1
+                    };
+                    ws.send(JSON.stringify(testRequest));
+                };
+                
+                ws.onmessage = (event) => {
+                    wsLog.innerHTML += `📩 收到消息: ${event.data}<br>`;
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.result) {
+                            wsLog.innerHTML += '✅ 成功获取 Cortex 信息<br>';
+                            log('Cortex API 响应正常', 'success');
+                        }
+                    } catch (e) {
+                        wsLog.innerHTML += '⚠️ 消息解析错误<br>';
+                    }
+                };
+                
+                ws.onerror = () => {
+                    wsLog.innerHTML += '❌ WebSocket 连接错误<br>';
+                    wsStatus.textContent = '连接失败';
+                    wsStatus.className = 'status status-error';
+                    log('WebSocket 连接失败 - 请确保 EMOTIV Launcher 正在运行', 'error');
+                };
+                
+                ws.onclose = () => {
+                    wsLog.innerHTML += '🔌 WebSocket 连接已关闭<br>';
+                };
+                
+                // 10秒后自动关闭连接
+                setTimeout(() => {
+                    if (ws.readyState === WebSocket.OPEN) {
+                        ws.close();
+                    }
+                }, 10000);
+                
+            } catch (error) {
+                wsLog.innerHTML += `❌ 连接异常: ${error.message}<br>`;
+                wsStatus.textContent = '异常';
+                wsStatus.className = 'status status-error';
+                log(`WebSocket 测试异常: ${error.message}`, 'error');
+            }
+        });
+        
+        // 视觉引擎测试
+        document.getElementById('testVisuals').addEventListener('click', () => {
+            const canvas = document.getElementById('testCanvas');
+            const status = document.getElementById('visualStatus');
+            
+            if (testVisualEngine) {
+                testVisualEngine.stop();
+            }
+            
+            // 简化的视觉引擎测试
+            testVisualEngine = new SimpleVisualTest(canvas);
+            testVisualEngine.start();
+            
+            status.textContent = '运行中';
+            status.className = 'status status-success';
+            log('视觉引擎测试启动', 'success');
+        });
+        
+        document.getElementById('stopVisuals').addEventListener('click', () => {
+            if (testVisualEngine) {
+                testVisualEngine.stop();
+                const status = document.getElementById('visualStatus');
+                status.textContent = '已停止';
+                status.className = 'status status-warning';
+                log('视觉引擎测试停止', 'info');
+            }
+        });
+        
+        // 简化的视觉测试类
+        class SimpleVisualTest {
+            constructor(canvas) {
+                this.canvas = canvas;
+                this.ctx = canvas.getContext('2d');
+                this.particles = [];
+                this.isRunning = false;
+                this.time = 0;
+                
+                // 创建测试粒子
+                for (let i = 0; i < 20; i++) {
+                    this.particles.push({
+                        x: Math.random() * canvas.width,
+                        y: Math.random() * canvas.height,
+                        vx: (Math.random() - 0.5) * 2,
+                        vy: (Math.random() - 0.5) * 2,
+                        size: Math.random() * 3 + 1,
+                        hue: Math.random() * 360
+                    });
+                }
+            }
+            
+            start() {
+                this.isRunning = true;
+                this.animate();
+            }
+            
+            stop() {
+                this.isRunning = false;
+            }
+            
+            animate() {
+                if (!this.isRunning) return;
+                
+                this.time += 0.02;
+                
+                // 清空画布
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                // 绘制渐变背景
+                const gradient = this.ctx.createLinearGradient(0, 0, this.canvas.width, this.canvas.height);
+                gradient.addColorStop(0, `hsl(${this.time * 10}, 50%, 20%)`);
+                gradient.addColorStop(1, `hsl(${this.time * 10 + 60}, 50%, 10%)`);
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                // 更新和绘制粒子
+                this.particles.forEach(particle => {
+                    // 更新位置
+                    particle.x += particle.vx;
+                    particle.y += particle.vy;
+                    
+                    // 边界检测
+                    if (particle.x < 0 || particle.x > this.canvas.width) particle.vx *= -1;
+                    if (particle.y < 0 || particle.y > this.canvas.height) particle.vy *= -1;
+                    
+                    // 绘制粒子
+                    this.ctx.save();
+                    this.ctx.globalAlpha = 0.7;
+                    this.ctx.fillStyle = `hsl(${particle.hue + this.time * 50}, 70%, 60%)`;
+                    this.ctx.beginPath();
+                    this.ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    this.ctx.restore();
+                });
+                
+                requestAnimationFrame(() => this.animate());
+            }
+        }
+        
+        // 模拟数据测试
+        document.getElementById('startSimulation').addEventListener('click', () => {
+            if (simulationRunning) return;
+            
+            simulationRunning = true;
+            const status = document.getElementById('simStatus');
+            status.textContent = '运行中';
+            status.className = 'status status-success';
+            log('开始模拟脑电数据', 'info');
+            
+            simulationInterval = setInterval(() => {
+                // 生成模拟的脑电指标
+                const stress = Math.random() * 0.3 + Math.sin(Date.now() / 5000) * 0.2 + 0.4;
+                const attention = Math.random() * 0.2 + Math.cos(Date.now() / 3000) * 0.3 + 0.6;
+                const relaxation = Math.random() * 0.3 + Math.sin(Date.now() / 7000) * 0.2 + 0.5;
+                
+                // 限制在 0-1 范围内
+                const metrics = {
+                    stress: Math.max(0, Math.min(1, stress)),
+                    attention: Math.max(0, Math.min(1, attention)),
+                    relaxation: Math.max(0, Math.min(1, relaxation))
+                };
+                
+                // 更新显示
+                document.getElementById('simStress').textContent = Math.round(metrics.stress * 100) + '%';
+                document.getElementById('simAttention').textContent = Math.round(metrics.attention * 100) + '%';
+                document.getElementById('simRelaxation').textContent = Math.round(metrics.relaxation * 100) + '%';
+                
+            }, 100); // 10Hz 更新频率
+        });
+        
+        document.getElementById('stopSimulation').addEventListener('click', () => {
+            if (simulationInterval) {
+                clearInterval(simulationInterval);
+                simulationInterval = null;
+            }
+            simulationRunning = false;
+            
+            const status = document.getElementById('simStatus');
+            status.textContent = '已停止';
+            status.className = 'status status-warning';
+            log('模拟数据测试停止', 'info');
+        });
+        
+        // 音频测试
+        document.getElementById('testAudio').addEventListener('click', () => {
+            const status = document.getElementById('audioStatus');
+            
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // 创建测试音调
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                oscillator.frequency.setValueAtTime(440, audioContext.currentTime); // A4
+                oscillator.type = 'sine';
+                
+                gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+                gainNode.gain.linearRampToValueAtTime(0.1, audioContext.currentTime + 0.1);
+                gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 1);
+                
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 1);
+                
+                status.textContent = '正常';
+                status.className = 'status status-success';
+                log('音频系统测试通过', 'success');
+                
+            } catch (error) {
+                status.textContent = '不可用';
+                status.className = 'status status-error';
+                log(`音频测试失败: ${error.message}`, 'error');
+            }
+        });
+        
+        // 兼容性检查
+        document.getElementById('checkCompatibility').addEventListener('click', () => {
+            const results = document.getElementById('compatibilityResults');
+            let html = '<div style="margin-top: 10px;">';
+            
+            const checks = [
+                { name: 'WebSocket', test: () => window.WebSocket, required: true },
+                { name: 'Canvas 2D', test: () => document.createElement('canvas').getContext('2d'), required: true },
+                { name: 'Web Audio API', test: () => window.AudioContext || window.webkitAudioContext, required: false },
+                { name: 'requestAnimationFrame', test: () => window.requestAnimationFrame, required: true },
+                { name: 'JSON', test: () => window.JSON, required: true },
+                { name: 'Promise', test: () => window.Promise, required: true },
+                { name: 'ES6 Classes', test: () => { try { eval('class Test {}'); return true; } catch(e) { return false; } }, required: true },
+                { name: 'Local Storage', test: () => window.localStorage, required: false }
+            ];
+            
+            let allRequired = true;
+            
+            checks.forEach(check => {
+                const supported = check.test();
+                const status = supported ? '✅' : '❌';
+                const className = supported ? 'status-success' : check.required ? 'status-error' : 'status-warning';
+                const required = check.required ? '(必需)' : '(可选)';
+                
+                html += `<div style="margin: 5px 0;">
+                    ${status} ${check.name} ${required}
+                    <span class="status ${className}">${supported ? '支持' : '不支持'}</span>
+                </div>`;
+                
+                if (check.required && !supported) {
+                    allRequired = false;
+                }
+            });
+            
+            html += '</div>';
+            results.innerHTML = html;
+            
+            if (allRequired) {
+                log('浏览器兼容性检查通过', 'success');
+            } else {
+                log('浏览器兼容性检查失败 - 缺少必需功能', 'error');
+            }
+        });
+        
+        // 实时数据流测试
+        document.getElementById('testRealData').addEventListener('click', async () => {
+            const wsStatus = document.getElementById('wsStatus');
+            const wsLog = document.getElementById('wsLog');
+            const dataStreamLog = document.getElementById('dataStreamLog');
+            
+            if (testCortexClient) {
+                log('正在断开现有连接...', 'info');
+                testCortexClient.disconnect();
+                testCortexClient = null;
+            }
+            
+            try {
+                // 引入配置文件中的凭证
+                if (typeof EMOTIV_CONFIG === 'undefined') {
+                    throw new Error('配置文件未加载，请确保 config.js 文件存在');
+                }
+                
+                const user = {
+                    clientId: EMOTIV_CONFIG.CLIENT_ID,
+                    clientSecret: EMOTIV_CONFIG.CLIENT_SECRET,
+                    license: EMOTIV_CONFIG.LICENSE || "",
+                    debit: 1
+                };
+                
+                log('开始测试实时数据流...', 'info');
+                wsStatus.textContent = '连接中...';
+                wsStatus.className = 'status status-warning';
+                
+                // 创建 Cortex 客户端实例
+                testCortexClient = new CortexClient();
+                
+                // 设置回调
+                testCortexClient.setCallback('connectionChange', (connected) => {
+                    if (connected) {
+                        wsStatus.textContent = '已连接';
+                        wsStatus.className = 'status status-success';
+                        wsLog.innerHTML += '✅ 已连接到 Cortex 服务<br>';
+                        log('Cortex 服务连接成功', 'success');
+                    } else {
+                        wsStatus.textContent = '连接断开';
+                        wsStatus.className = 'status status-error';
+                        wsLog.innerHTML += '❌ 连接已断开<br>';
+                    }
+                });
+                
+                testCortexClient.setCallback('metricsData', (metrics) => {
+                    // 更新实时显示
+                    document.getElementById('rawStress').textContent = metrics.stress.toFixed(3);
+                    document.getElementById('rawAttention').textContent = metrics.attention.toFixed(3);
+                    document.getElementById('rawRelaxation').textContent = metrics.relaxation.toFixed(3);
+                    
+                    // 在日志中显示
+                    const timestamp = new Date().toLocaleTimeString();
+                    dataStreamLog.innerHTML += `[${timestamp}] 压力:${metrics.stress.toFixed(3)} 注意力:${metrics.attention.toFixed(3)} 放松:${metrics.relaxation.toFixed(3)}<br>`;
+                    dataStreamLog.scrollTop = dataStreamLog.scrollHeight;
+                });
+                
+                testCortexClient.setCallback('error', (error) => {
+                    wsLog.innerHTML += `❌ 错误: ${error}<br>`;
+                    log('连接错误: ' + error, 'error');
+                });
+                
+                // 开始连接流程
+                await testCortexClient.connect(user);
+                await testCortexClient.initializeSession();
+                await testCortexClient.subscribeToMetrics();
+                
+                log('实时数据流测试启动成功，观察右侧数据流监控', 'success');
+                
+            } catch (error) {
+                wsStatus.textContent = '连接失败';
+                wsStatus.className = 'status status-error';
+                wsLog.innerHTML += `❌ 测试失败: ${error.message}<br>`;
+                log('实时数据流测试失败: ' + error.message, 'error');
+            }
+        });
+        
+        // 页面加载时的初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            log('测试页面已加载', 'info');
+            log('请按顺序进行各项测试以确保系统正常工作', 'info');
+        });
+    </script>
+</body>
+</html>
